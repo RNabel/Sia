@@ -71,12 +71,12 @@ type (
 		// priority upload chan, and finally all of the work in the upload
 		// chan.
 		//
-		// A busy higher priority channel is able to entriely starve all of the
+		// A busy higher priority channel is able to entirely starve all of the
 		// channels with lower priority.
-		downloadChan         chan downloadWork // higher priority than all uploads
-		killChan             chan struct{}     // highest priority
-		priorityDownloadChan chan downloadWork // higher priority than downloads (used for user-initiated downloads)
-		uploadChan           chan uploadWork   // lowest priority
+		downloadChan         chan downloadWork // Higher priority than all uploads.
+		killChan             chan struct{}     // Highest priority.
+		priorityDownloadChan chan downloadWork // Higher priority than downloads (used for user-initiated downloads).
+		uploadChan           chan uploadWork   // Lowest priority.
 
 		// recentUploadFailure documents the most recent time that an upload
 		// has failed.
@@ -87,7 +87,7 @@ type (
 		// has failed.
 		recentDownloadFailure time.Time // Only modified by the primary download loop.
 
-		// Utilities
+		// Utilities.
 		renter *Renter
 	}
 )

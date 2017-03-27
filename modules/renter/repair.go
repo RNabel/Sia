@@ -491,6 +491,7 @@ func (r *Renter) threadedRepairLoop() {
 		resultChan:       make(chan finishedUpload),
 	}
 	for {
+		// TODO: Handle error.
 		if r.tg.Add() != nil {
 			return
 		}

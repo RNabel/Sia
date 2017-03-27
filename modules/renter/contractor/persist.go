@@ -82,7 +82,7 @@ func (c *Contractor) load() error {
 	for _, contract := range data.Contracts {
 		if len(contract.HostPublicKey.Key) == 0 {
 			data.Contracts = addPubKeys(c.cs, data.Contracts)
-			break // only need to rescan once
+			break // Only need to rescan once.
 		}
 	}
 
