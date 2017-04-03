@@ -77,6 +77,13 @@ have a reasonable number (>30) of hosts in your hostdb.`,
 		Run:   wrap(renterfilesdownloadcmd),
 	}
 
+	renterDownloadChunkCmd = &cobra.Command{
+		Use: "downloadchunk [local] [chunkid] [remote]",
+		Short: "Download a chunk",
+		Long: "Download a specific chunk from a previously uploaded file.",
+		Run: wrap(renterfilesdownloadchunkcmd),
+	}
+
 	renterFilesListCmd = &cobra.Command{
 		Use:     "list",
 		Aliases: []string{"ls"},
@@ -196,7 +203,7 @@ func renterdownloadscmd() {
 	} else {
 		fmt.Println("Downloading", len(downloading), "files:")
 		for _, file := range downloading {
-			fmt.Printf("%s: %5.1f%% %s -> %s\n", file.StartTime.Format("Jan 02 03:04 PM"), 100*float64(file.Received)/float64(file.Filesize), file.SiaPath, file.Destination)
+			fmt.Printf("%s: %5.1f%% %s -> %s\n", file.StartTime.Format("Jan 02 03:04 PM"), 100 * float64(file.Received) / float64(file.Filesize), file.SiaPath, file.Destination)
 		}
 	}
 	if !renterShowHistory {
@@ -257,8 +264,12 @@ func rentersetallowancecmd(amount, period string) {
 // contracts have the same value, they are sorted by their host's address.
 type byValue []api.RenterContract
 
-func (s byValue) Len() int      { return len(s) }
-func (s byValue) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
+func (s byValue) Len() int {
+	return len(s)
+}
+func (s byValue) Swap(i, j int) {
+	s[i], s[j] = s[j], s[i]
+}
 func (s byValue) Less(i, j int) bool {
 	cmp := s[i].RenterFunds.Cmp(s[j].RenterFunds)
 	if cmp == 0 {
@@ -297,7 +308,7 @@ func rentercontractscmd() {
 // renterfilesdeletecmd is the handler for the command `siac renter delete [path]`.
 // Removes the specified path from the Sia network.
 func renterfilesdeletecmd(path string) {
-	err := post("/renter/delete/"+path, "")
+	err := post("/renter/delete/" + path, "")
 	if err != nil {
 		die("Could not delete file:", err)
 	}
@@ -317,7 +328,7 @@ func renterfilesdownloadcmd(path, destination string) {
 				return
 
 			case <-time.Tick(time.Second):
-				// get download progress of file
+			// get download progress of file
 				var queue api.RenterDownloadQueue
 				err := getAPI("/renter/downloads", &queue)
 				if err != nil {
@@ -335,7 +346,7 @@ func renterfilesdownloadcmd(path, destination string) {
 				pct := 100 * float64(d.Received) / float64(d.Filesize)
 				elapsed := time.Since(d.StartTime)
 				elapsed -= elapsed % time.Second // round to nearest second
-				mbps := (float64(d.Received*8) / 1e6) / time.Since(d.StartTime).Seconds()
+				mbps := (float64(d.Received * 8) / 1e6) / time.Since(d.StartTime).Seconds()
 				fmt.Printf("\rDownloading... %5.1f%% of %v, %v elapsed, %.2f Mbps    ", pct, filesizeUnits(int64(d.Filesize)), elapsed, mbps)
 			}
 		}
@@ -349,13 +360,67 @@ func renterfilesdownloadcmd(path, destination string) {
 	fmt.Printf("\nDownloaded '%s' to %s.\n", path, abs(destination))
 }
 
+// renterfilesdownloadchunkcmd is the handler for the command `siac renter download chunk [path]
+// [chunk id] [destination]`.
+// Downloads a specific chunk to the local specified destination.
+func renterfilesdownloadchunkcmd(path string, cid string, destination string) {
+	destination = abs(destination)
+	done := make(chan struct{})
+	//go func() {
+	//	time.Sleep(time.Second) // give download time to initialize
+	//	for {
+	//		select {
+	//		case <-done:
+	//			return
+	//
+	//		case <-time.Tick(time.Second):
+	//		// get download progress of file
+	//			var queue api.RenterDownloadQueue
+	//			err := getAPI("/renter/downloads", &queue)
+	//			if err != nil {
+	//				continue // benign
+	//			}
+	//			var d modules.DownloadInfo
+	//			for _, d = range queue.Downloads {
+	//				if d.Destination == destination {
+	//					break
+	//				}
+	//			}
+	//			if d.Filesize == 0 {
+	//				continue // file hasn't appeared in queue yet
+	//			}
+	//			pct := 100 * float64(d.Received) / float64(d.Filesize)
+	//			elapsed := time.Since(d.StartTime)
+	//			elapsed -= elapsed % time.Second // round to nearest second
+	//			mbps := (float64(d.Received * 8) / 1e6) / time.Since(d.StartTime).Seconds()
+	//			fmt.Printf("\rDownloading... %5.1f%% of %v, %v elapsed, %.2f Mbps    ", pct, filesizeUnits(int64(d.Filesize)), elapsed, mbps)
+	//		}
+	//	}
+	//}()
+	req := fmt.Sprintf("/renter/downloadchunk/%s?destination=%s&chunkindex=%s", path, destination, cid)
+
+	err := get(req)
+	close(done)
+	if err != nil {
+		die("Could not download file:", err)
+	}
+	fmt.Printf("\nDownloaded '%s' to %s.\n", path, abs(destination))
+
+}
+
 // bySiaPath implements sort.Interface for [] modules.FileInfo based on the
 // SiaPath field.
 type bySiaPath []modules.FileInfo
 
-func (s bySiaPath) Len() int           { return len(s) }
-func (s bySiaPath) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
-func (s bySiaPath) Less(i, j int) bool { return s[i].SiaPath < s[j].SiaPath }
+func (s bySiaPath) Len() int {
+	return len(s)
+}
+func (s bySiaPath) Swap(i, j int) {
+	s[i], s[j] = s[j], s[i]
+}
+func (s bySiaPath) Less(i, j int) bool {
+	return s[i].SiaPath < s[j].SiaPath
+}
 
 // renterfileslistcmd is the handler for the command `siac renter list`.
 // Lists files known to the renter on the network.
@@ -402,7 +467,7 @@ func renterfileslistcmd() {
 // renterfilesrenamecmd is the handler for the command `siac renter rename [path] [newpath]`.
 // Renames a file on the Sia network.
 func renterfilesrenamecmd(path, newpath string) {
-	err := post("/renter/rename/"+path, "newsiapath="+newpath)
+	err := post("/renter/rename/" + path, "newsiapath=" + newpath)
 	if err != nil {
 		die("Could not rename file:", err)
 	}
@@ -412,7 +477,7 @@ func renterfilesrenamecmd(path, newpath string) {
 // renterfilesuploadcmd is the handler for the command `siac renter upload [source] [path]`.
 // Uploads the [source] file to [path] on the Sia network.
 func renterfilesuploadcmd(source, path string) {
-	err := post("/renter/upload/"+path, "source="+abs(source))
+	err := post("/renter/upload/" + path, "source=" + abs(source))
 	if err != nil {
 		die("Could not upload file:", err)
 	}

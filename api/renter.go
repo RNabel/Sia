@@ -15,6 +15,7 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 
 	"github.com/julienschmidt/httprouter"
+	"strconv"
 )
 
 var (
@@ -336,6 +337,25 @@ func (api *API) renterDownloadHandler(w http.ResponseWriter, req *http.Request, 
 	}
 
 	WriteSuccess(w)
+}
+
+func (api *API) renterDownloadchunkHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
+	destination := req.FormValue("destination")
+	cindparam := req.FormValue("chunkindex")
+
+	cindex, err := strconv.ParseUint(cindparam, 10, 64)
+	if err != nil {
+		WriteError(w, Error{"could not decode the chunk index as uint64: " + err.Error()}, http.StatusBadRequest)
+	}
+
+	err = api.renter.DownloadChunk(strings.TrimPrefix(ps.ByName("siapath"), "/"), destination, cindex)
+	if err != nil {
+		WriteError(w, Error{"download failed: " + err.Error()}, http.StatusInternalServerError)
+		return
+	}
+
+	// TODO: Change to WriteSuccess(w).
+	WriteError(w, Error{"received destination: " + destination + " and cid: " + strconv.FormatUint(cindex, 10)}, http.StatusAccepted)
 }
 
 // renterDownloadAsyncHandler handles the API call to download a file asynchronously.
