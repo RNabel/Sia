@@ -23,6 +23,9 @@ func (r *Renter) Download(path, destination string) error {
 func (r *Renter) DownloadChunk(path, destination string, cindex uint64) error {
 	// Lookup the file associated with the nickname.
 	lockID := r.mu.RLock()
+
+	fmt.Printf("DownloadChunk: path %s, dst: %s, cindex: %d\n", path, destination, cindex)
+
 	file, exists := r.files[path]
 	r.mu.RUnlock(lockID)
 	if !exists {
@@ -39,7 +42,7 @@ func (r *Renter) DownloadChunk(path, destination string, cindex uint64) error {
 	d := r.newDownload(file, destination, currentContracts)
 
 	// Catch error if chunk index is not in file.
-	if cindex < d.numChunks && cindex != MAX_UINT64 {
+	if cindex < 0 && cindex >= d.numChunks && cindex != MAX_UINT64 {
 		r.log.Critical("Passed index invalid. Index: %d, numChunks: %d\n", cindex, d.numChunks)
 
 		emsg := fmt.Sprintf("DownloadChunk: Chunk index not in range of stored chunks. Max chunk index = %d\n", d.numChunks - 1)

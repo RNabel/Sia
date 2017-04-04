@@ -78,7 +78,7 @@ have a reasonable number (>30) of hosts in your hostdb.`,
 	}
 
 	renterDownloadChunkCmd = &cobra.Command{
-		Use: "downloadchunk [local] [chunkid] [remote]",
+		Use: "downloadchunk [path] [chunkid] [destination]",
 		Short: "Download a chunk",
 		Long: "Download a specific chunk from a previously uploaded file.",
 		Run: wrap(renterfilesdownloadchunkcmd),
@@ -397,12 +397,14 @@ func renterfilesdownloadchunkcmd(path string, cid string, destination string) {
 	//		}
 	//	}
 	//}()
+	//req := "/renter/download/" + path + "?destination=" + destination
 	req := fmt.Sprintf("/renter/downloadchunk/%s?destination=%s&chunkindex=%s", path, destination, cid)
 
+	//err := get("/renter/download/" + path + "?destination=" + destination)
 	err := get(req)
 	close(done)
 	if err != nil {
-		die("Could not download file:", err)
+		die("Error ocurred:", err)
 	}
 	fmt.Printf("\nDownloaded '%s' to %s.\n", path, abs(destination))
 
