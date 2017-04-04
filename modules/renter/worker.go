@@ -39,7 +39,7 @@ type (
 	// finishedUpload contains the Merkle root and error from performing an
 	// upload.
 	finishedUpload struct {
-		chunkID    chunkID
+		chunkID    cid
 		dataRoot   crypto.Hash
 		err        error
 		pieceIndex uint64
@@ -50,7 +50,7 @@ type (
 	// channel for returning the results.
 	uploadWork struct {
 		// data is the payload of the upload.
-		chunkID    chunkID
+		chunkID    cid
 		data       []byte
 		file       *file
 		pieceIndex uint64

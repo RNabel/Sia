@@ -47,7 +47,7 @@ type (
 
 	// chunkID can be used to uniquely identify a chunk within the repair
 	// matrix.
-	chunkID struct {
+	cid struct {
 		index    uint64 // the index of the chunk within its file.
 		filename string
 	}
@@ -71,7 +71,7 @@ type (
 		activeWorkers    map[types.FileContractID]*worker
 		availableWorkers map[types.FileContractID]*worker
 		gapCounts        map[int]int
-		incompleteChunks map[chunkID]*chunkStatus
+		incompleteChunks map[cid]*chunkStatus
 		resultChan       chan finishedUpload
 	}
 )
@@ -157,7 +157,7 @@ func (r *Renter) addFileToRepairState(rs *repairState, file *file) {
 		}
 
 		// Skip this chunk if it's already in the set of incomplete chunks.
-		cid := chunkID{i, file.name}
+		cid := cid{i, file.name}
 		_, exists := rs.incompleteChunks[cid]
 		if exists {
 			continue
@@ -236,7 +236,7 @@ func (r *Renter) managedRepairIteration(rs *repairState) {
 	}
 
 	// Scan through the chunks until a candidate for uploads is found.
-	var chunksToDelete []chunkID
+	var chunksToDelete []cid
 	for chunkID, chunkStatus := range rs.incompleteChunks {
 		// Update the number of gaps for this chunk.
 		numGaps := chunkStatus.numGaps(rs)
@@ -296,7 +296,7 @@ func (r *Renter) managedRepairIteration(rs *repairState) {
 
 // managedScheduleChunkRepair takes a chunk and schedules some repair on that
 // chunk using the chunk state and a list of workers.
-func (r *Renter) managedScheduleChunkRepair(rs *repairState, chunkID chunkID, chunkStatus *chunkStatus, usefulWorkers []types.FileContractID) error {
+func (r *Renter) managedScheduleChunkRepair(rs *repairState, chunkID cid, chunkStatus *chunkStatus, usefulWorkers []types.FileContractID) error {
 	// Check that the file is still in the renter.
 	filename := chunkID.filename
 	id := r.mu.RLock()
@@ -487,7 +487,7 @@ func (r *Renter) threadedRepairLoop() {
 		activeWorkers:    make(map[types.FileContractID]*worker),
 		availableWorkers: make(map[types.FileContractID]*worker),
 		gapCounts:        make(map[int]int),
-		incompleteChunks: make(map[chunkID]*chunkStatus),
+		incompleteChunks: make(map[cid]*chunkStatus),
 		resultChan:       make(chan finishedUpload),
 	}
 	for {

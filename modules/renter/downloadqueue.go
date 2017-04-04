@@ -4,12 +4,12 @@ import (
 	"errors"
 	"sync/atomic"
 
+	"fmt"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
-	"fmt"
 )
 
-const(
+const (
 	// Effectively used as flag to indicate that entire file has to be downloaded.
 	MAX_UINT64 = ^uint64(0)
 )
@@ -39,23 +39,23 @@ func (r *Renter) DownloadChunk(path, destination string, cindex uint64) error {
 	}
 
 	// Create the download object and add it to the queue.
-	d := r.newDownload(file, destination, currentContracts)
+	var d *download
+	if cindex == MAX_UINT64 {
+		d = r.newDownload(file, destination, currentContracts)
+	} else {
+		d = r.newChunkDownload(file, destination, currentContracts, cindex)
+	}
+
+	fmt.Printf("Download chunk called with cid: %d\n", cindex)
 
 	// Catch error if chunk index is not in file.
-	if cindex < 0 && cindex >= d.numChunks && cindex != MAX_UINT64 {
+	if cindex < 0 && cindex >= file.numChunks() && cindex != MAX_UINT64 {
 		r.log.Critical("Passed index invalid. Index: %d, numChunks: %d\n", cindex, d.numChunks)
 
-		emsg := fmt.Sprintf("DownloadChunk: Chunk index not in range of stored chunks. Max chunk index = %d\n", d.numChunks - 1)
+		emsg := fmt.Sprintf("DownloadChunk: Chunk index not in range of stored chunks. Max chunk index = %d\n", d.numChunks-1)
 		return errors.New(emsg)
 	} else {
 		r.log.Printf("DownloadChunk: Chunk index valid: %d, # chunks: %d", cindex, d.numChunks)
-	}
-
-	// Go through the `finishedChunks` list and set all to true except the requested chunk.
-	if cindex != MAX_UINT64 {
-		for i := range d.finishedChunks {
-			d.finishedChunks[i] = uint64(i) != cindex // Set all but bool at `index` to true.
-		}
 	}
 
 	lockID = r.mu.Lock()
@@ -83,7 +83,7 @@ func (r *Renter) DownloadQueue() []modules.DownloadInfo {
 	// Order from most recent to least recent.
 	downloads := make([]modules.DownloadInfo, len(r.downloadQueue))
 	for i := range r.downloadQueue {
-		d := r.downloadQueue[len(r.downloadQueue) - i - 1]
+		d := r.downloadQueue[len(r.downloadQueue)-i-1]
 		downloads[i] = modules.DownloadInfo{
 			SiaPath:     d.siapath,
 			Destination: d.destination,
