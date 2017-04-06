@@ -8,11 +8,21 @@ import (
 	"github.com/NebulousLabs/Sia/types"
 )
 
+const (
+	// Effectively used as flag to indicate that entire file has to be downloaded.
+	MAX_UINT64 = ^uint64(0)
+)
+
 // Download downloads a file, identified by its path, to the destination
 // specified.
 func (r *Renter) Download(path, destination string) error {
+	return r.DownloadChunk(path, destination, MAX_UINT64)
+}
+
+func (r *Renter) DownloadChunk(path, destination string, cindex uint64) error {
 	// Lookup the file associated with the nickname.
 	lockID := r.mu.RLock()
+
 	file, exists := r.files[path]
 	r.mu.RUnlock(lockID)
 	if !exists {
@@ -26,8 +36,21 @@ func (r *Renter) Download(path, destination string) error {
 	}
 
 	// Create the download object and add it to the queue.
-	d := r.newDownload(file, destination, currentContracts)
+	var d *download
+	if cindex == MAX_UINT64 {
+		d = r.newDownload(file, destination, currentContracts)
+	} else {
+		// Check whether the chunk index is valid.
+		numChunks := file.numChunks()
+		if cindex < 0 && cindex >= numChunks {
+			emsg := "chunk index not in range of stored chunks. Max chunk index = " + string(numChunks-1)
+			return errors.New(emsg)
+		}
+		d = r.newChunkDownload(file, destination, currentContracts, cindex)
+	}
+
 	lockID = r.mu.Lock()
+	r.log.Printf("Appending to download queue: %+v\n", d)
 	r.downloadQueue = append(r.downloadQueue, d)
 	r.mu.Unlock(lockID)
 	r.newDownloads <- d

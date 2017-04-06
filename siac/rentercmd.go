@@ -77,6 +77,13 @@ have a reasonable number (>30) of hosts in your hostdb.`,
 		Run:   wrap(renterfilesdownloadcmd),
 	}
 
+	renterDownloadChunkCmd = &cobra.Command{
+		Use:   "downloadchunk [path] [chunkid] [destination]",
+		Short: "Download a chunk",
+		Long:  "Download a specific chunk from a previously uploaded file.",
+		Run:   wrap(renterfilesdownloadchunkcmd),
+	}
+
 	renterFilesListCmd = &cobra.Command{
 		Use:     "list",
 		Aliases: []string{"ls"},
@@ -349,13 +356,63 @@ func renterfilesdownloadcmd(path, destination string) {
 	fmt.Printf("\nDownloaded '%s' to %s.\n", path, abs(destination))
 }
 
+// renterfilesdownloadchunkcmd is the handler for the command `siac renter download chunk [path]
+// [chunk id] [destination]`.
+// Downloads a specific chunk to the local specified destination.
+func renterfilesdownloadchunkcmd(path string, cid string, destination string) {
+	destination = abs(destination)
+	done := make(chan struct{})
+	go func() {
+		time.Sleep(time.Second) // give download time to initialize
+		for {
+			select {
+			case <-done:
+				return
+
+			case <-time.Tick(time.Second):
+				// get download progress of file
+				var queue api.RenterDownloadQueue
+				err := getAPI("/renter/downloads", &queue)
+				if err != nil {
+					continue // benign
+				}
+				var d modules.DownloadInfo
+				for _, d = range queue.Downloads {
+					if d.Destination == destination {
+						break
+					}
+				}
+				if d.Filesize == 0 {
+					continue // file hasn't appeared in queue yet
+				}
+				pct := 100 * float64(d.Received) / float64(d.Filesize)
+				elapsed := time.Since(d.StartTime)
+				elapsed -= elapsed % time.Second // round to nearest second
+				mbps := (float64(d.Received*8) / 1e6) / time.Since(d.StartTime).Seconds()
+				fmt.Printf("\rDownloading... %5.1f%% of %v, %v elapsed, %.2f Mbps    ", pct, filesizeUnits(int64(d.Filesize)), elapsed, mbps)
+			}
+		}
+	}()
+	req := fmt.Sprintf("/renter/downloadchunk/%s?destination=%s&chunkindex=%s", path, destination, cid)
+
+	err := get(req)
+	close(done)
+	if err != nil {
+		die("Error ocurred:", err)
+	}
+	fmt.Printf("\nDownloaded '%s' to %s.\n", path, abs(destination))
+
+}
+
 // bySiaPath implements sort.Interface for [] modules.FileInfo based on the
 // SiaPath field.
 type bySiaPath []modules.FileInfo
 
-func (s bySiaPath) Len() int           { return len(s) }
-func (s bySiaPath) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
-func (s bySiaPath) Less(i, j int) bool { return s[i].SiaPath < s[j].SiaPath }
+func (s bySiaPath) Len() int      { return len(s) }
+func (s bySiaPath) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
+func (s bySiaPath) Less(i, j int) bool {
+	return s[i].SiaPath < s[j].SiaPath
+}
 
 // renterfileslistcmd is the handler for the command `siac renter list`.
 // Lists files known to the renter on the network.
