@@ -21,6 +21,8 @@ func (r *Renter) Download(path, destination string) error {
 }
 
 func (r *Renter) DownloadChunk(path, destination string, cindex uint64) error {
+	r.log.Printf("Download chunk called with cid: %d\n", cindex)
+
 	// Lookup the file associated with the nickname.
 	lockID := r.mu.RLock()
 
@@ -46,8 +48,6 @@ func (r *Renter) DownloadChunk(path, destination string, cindex uint64) error {
 		d = r.newChunkDownload(file, destination, currentContracts, cindex)
 	}
 
-	fmt.Printf("Download chunk called with cid: %d\n", cindex)
-
 	// Catch error if chunk index is not in file.
 	if cindex < 0 && cindex >= file.numChunks() && cindex != MAX_UINT64 {
 		r.log.Critical("Passed index invalid. Index: %d, numChunks: %d\n", cindex, d.numChunks)
@@ -55,10 +55,11 @@ func (r *Renter) DownloadChunk(path, destination string, cindex uint64) error {
 		emsg := fmt.Sprintf("DownloadChunk: Chunk index not in range of stored chunks. Max chunk index = %d\n", d.numChunks-1)
 		return errors.New(emsg)
 	} else {
-		r.log.Printf("DownloadChunk: Chunk index valid: %d, # chunks: %d", cindex, d.numChunks)
+		r.log.Printf("DownloadChunk: Chunk index valid: %d, # chunks: %d\n", cindex, d.numChunks)
 	}
 
 	lockID = r.mu.Lock()
+	r.log.Printf("Appending to download queue: %+v\n", d)
 	r.downloadQueue = append(r.downloadQueue, d)
 	r.mu.Unlock(lockID)
 	r.newDownloads <- d

@@ -94,6 +94,7 @@ type (
 
 // download will perform some download work.
 func (w *worker) download(dw downloadWork) {
+	w.renter.log.Printf("Performing download: chunk dl index: %v, piece index: %v\n", dw.chunkDownload.index, dw.pieceIndex)
 	d, err := w.renter.hostContractor.Downloader(w.contractID, w.renter.tg.StopChan())
 	if err != nil {
 		select {

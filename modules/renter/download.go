@@ -12,7 +12,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"fmt"
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
@@ -136,6 +135,7 @@ func (r *Renter) newDownload(f *file, destination string, currentContracts map[m
 }
 
 func (r *Renter) newChunkDownload(f *file, destination string, currentContracts map[modules.NetAddress]types.FileContractID, cid uint64) *download {
+	r.log.Println("Chunk download called.")
 	d := &download{}
 	d.initDownload(f, destination)
 
@@ -148,7 +148,7 @@ func (r *Renter) newChunkDownload(f *file, destination string, currentContracts 
 	d.allocatePieceSize()
 	d.allocatePieceSet()
 	d.initPieceSetChunk(cid, f, currentContracts, r)
-
+	r.log.Printf("newChunkDownload returns: %+v\n", d)
 	return d
 }
 
@@ -211,17 +211,16 @@ func (d *download) initPieceSetRaw(cid uint64, f *file,
 			if cdl {
 				if contract.Pieces[i].Chunk == cid {
 					pieceSetIndex = 0
-					fmt.Println("pieceSetIndex set to 0.")
 				} else {
-					fmt.Println("Iteration skipped.")
 					continue
 				}
 			} else {
-				fmt.Println("cdl is false")
+				r.log.Println("cdl is false")
 			}
 			d.pieceSet[pieceSetIndex][id] = contract.Pieces[i]
 		}
 	}
+	r.log.Printf("initPieceSetRaw, called with %d", cid)
 	f.mu.RUnlock()
 }
 
@@ -346,6 +345,7 @@ func (cd *chunkDownload) recoverChunk() error {
 // addDownloadToChunkQueue takes a file and adds all incomplete work from the file
 // to the renter's chunk queue.
 func (r *Renter) addDownloadToChunkQueue(d *download) {
+	//r.log.Printf("Adding download to chunk queue: %+v\n", d)
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
@@ -356,6 +356,7 @@ func (r *Renter) addDownloadToChunkQueue(d *download) {
 	}
 
 	// Add the unfinished chunks one at a time.
+	r.log.Printf("len(finishedChunks)=%d", len(d.finishedChunks))
 	for i := range d.finishedChunks {
 		// Skip chunks that have already finished downloading.
 		if d.finishedChunks[i] {
@@ -369,6 +370,7 @@ func (r *Renter) addDownloadToChunkQueue(d *download) {
 		} else {
 			index = d.chunkIndex
 		}
+		//r.log.Printf("Current chunk index: %d\n", index)
 
 		// Add this chunk to the chunk queue.
 		cd := &chunkDownload{
@@ -381,6 +383,7 @@ func (r *Renter) addDownloadToChunkQueue(d *download) {
 		for fcid := range d.pieceSet[i] {
 			cd.workerAttempts[fcid] = false
 		}
+		//r.log.Printf("Chunk download object appended: %+v\n", cd)
 		r.chunkQueue = append(r.chunkQueue, cd)
 	}
 }
