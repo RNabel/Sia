@@ -11,6 +11,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+	"fmt"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/crypto"
@@ -67,6 +68,7 @@ type (
 		finishedChunks      []bool
 		isWholeFileDownload bool   // needed to support chunk downloads
 		chunkIndex          uint64 // only used when downloading individual chunk
+		totalChunks 	    uint64
 
 		// Timestamp information.
 		completeTime time.Time
@@ -142,6 +144,7 @@ func (r *Renter) newChunkDownload(f *file, destination string, currentContracts 
 	// Settings specific to a chunk download.
 	d.isWholeFileDownload = false
 	d.chunkIndex = cid
+	d.totalChunks = d.numChunks
 	d.numChunks = 1
 	d.finishedChunks = make([]bool, 1)
 
@@ -248,10 +251,14 @@ func (d *download) fail(err error) {
 // downloaded and verifies, decrypts and decodes them into the file.
 func (cd *chunkDownload) recoverChunk() error {
 	var index uint64 // Needed to handle chunk downloads.
+	var lastChunk bool
 	if cd.download.isWholeFileDownload {
 		index = cd.index
+		lastChunk = cd.index == cd.download.numChunks-1
 	} else {
 		index = 0
+		lastChunk = cd.index == cd.download.totalChunks-1
+		fmt.Printf("index: %d, lastChunk: %d", index, lastChunk)
 	}
 
 	// Assemble the chunk from the download.
@@ -288,7 +295,7 @@ func (cd *chunkDownload) recoverChunk() error {
 	// Recover the chunk into a byte slice.
 	recoverWriter := new(bytes.Buffer)
 	recoverSize := cd.download.chunkSize
-	if cd.index == cd.download.numChunks-1 && cd.download.fileSize%cd.download.chunkSize != 0 {
+	if lastChunk && cd.download.fileSize%cd.download.chunkSize != 0 {
 		recoverSize = cd.download.fileSize % cd.download.chunkSize
 	}
 	err := cd.download.erasureCode.Recover(chunk, recoverSize, recoverWriter)
