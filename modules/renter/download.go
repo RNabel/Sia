@@ -46,7 +46,7 @@ var (
 	// This is an effective measure to reduce latency, as chunk latency
 	// is the min( set( all piece latencies ) ).
 	maxActivePPCMultiplier = build.Select(build.Var{
-		Standard: float32(1.2),
+		Standard: float32(2.0),
 		Dev:      float32(1.2),
 		Testing:  float32(1.2),
 	}).(float32)
@@ -56,7 +56,7 @@ var (
 	// remaining all chunks will use a higher number of concurrent piece
 	// downloads.
 	numFastChunks = build.Select(build.Var{
-		Standard: int(4),
+		Standard: int(20),
 		Dev:      int(4),
 		Testing:  int(4),
 	}).(int)
