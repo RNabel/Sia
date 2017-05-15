@@ -408,6 +408,32 @@ func (api *API) renterDownloadHandler(w http.ResponseWriter, req *http.Request, 
 	}
 }
 
+func (api *API) renterDownloadHeadRequestHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
+	// Extract the requested siapath.
+	siapath := strings.TrimPrefix(ps.ByName("siapath"), "/")
+
+	fileExists := false
+	var f modules.FileInfo
+
+	files := api.renter.FileList()
+	for _, file := range files {
+		if file.SiaPath == siapath {
+			fileExists = true
+			f = file
+		}
+	}
+
+	if !fileExists {
+		WriteError(w, Error{"file at specified siapath does not exist"}, http.StatusBadRequest)
+		return
+	}
+
+	w.Header().Add("Accept-Ranges", "bytes")
+	w.Header().Add("Content-Length", strconv.FormatUint(f.Filesize, 10)) // TODO fix this.
+
+	w.WriteHeader(http.StatusOK)
+}
+
 // renterDownloadAsyncHandler handles the API call to download a file asynchronously.
 func (api *API) renterDownloadAsyncHandler(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
 	// Ensure that the async flag is not set to false.
