@@ -16,7 +16,6 @@ import (
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
-	"math"
 )
 
 const (
@@ -47,7 +46,7 @@ var (
 	// This is an effective measure to reduce latency, as chunk latency
 	// is the min( set( all piece latencies ) ).
 	maxActivePPCMultiplier = build.Select(build.Var{
-		Standard: float32(1.2),
+		Standard: float32(3.0),
 		Dev:      float32(1.2),
 		Testing:  float32(1.2),
 	}).(float32)
