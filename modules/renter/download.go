@@ -33,7 +33,7 @@ var (
 	//
 	// TODO: Allow this number to be established in the renter settings.
 	maxActiveDownloadPieces = build.Select(build.Var{
-		Standard: int(60),
+		Standard: int(1000),
 		Dev:      int(10),
 		Testing:  int(5),
 	}).(int)
@@ -46,7 +46,7 @@ var (
 	// This is an effective measure to reduce latency, as chunk latency
 	// is the min( set( all piece latencies ) ).
 	maxActivePPCMultiplier = build.Select(build.Var{
-		Standard: float32(3.0),
+		Standard: float32(1.4),
 		Dev:      float32(1.2),
 		Testing:  float32(1.2),
 	}).(float32)
@@ -56,7 +56,7 @@ var (
 	// remaining all chunks will use a higher number of concurrent piece
 	// downloads.
 	numFastChunks = build.Select(build.Var{
-		Standard: int(4),
+		Standard: int(3),
 		Dev:      int(4),
 		Testing:  int(4),
 	}).(int)
@@ -112,6 +112,7 @@ type (
 		// Synchronization tools.
 		downloadFinished chan struct{}
 		mu               sync.Mutex
+		finished []bool
 	}
 
 	// downloadState tracks all of the stateful information within the download
@@ -174,6 +175,7 @@ func (d *download) initDownload(f *file, destination modules.DownloadWriter) {
 	d.siapath = f.name
 	d.downloadFinished = make(chan struct{})
 	d.finishedChunks = make(map[int]bool)
+	d.finished = make([]bool, d.numChunks)
 }
 
 // initPieceSet initialises the piece set, including calculations of the total download size.
@@ -364,7 +366,7 @@ func (r *Renter) addDownloadToChunkQueue(d *download) {
 		// If the chunk's download speed should be sped up, the piece
 		// count will be raised above the minimum required.
 		// speedupchunk is true if it is the Nth last chunk where N is defined by `numFastChunks`.
-		speedupchunk := (d.numChunks - uint64(i)) <= uint64(numFastChunks)
+		speedupchunk := i <= numFastChunks
 		var maxpieces = d.erasureCode.MinPieces()
 		if speedupchunk {
 			min := maxpieces
@@ -477,7 +479,7 @@ loop:
 
 		// Try to find a worker that is able to pick up the slack on the
 		// incomplete download from the set of available workers.
-		for i, worker := range ds.availableWorkers {
+		for _, worker := range ds.availableWorkers {
 			scheduled, exists := incompleteChunk.workerAttempts[worker.contractID]
 			if scheduled || !exists {
 				// Either this worker does not contain a piece of this chunk,
@@ -496,9 +498,10 @@ loop:
 				pieceIndex:    piece.Piece,
 				chunkDownload: incompleteChunk,
 				resultChan:    ds.resultChan,
+				finished: &incompleteChunk.download.finished,
 			}
 			incompleteChunk.workerAttempts[worker.contractID] = true
-			ds.availableWorkers = append(ds.availableWorkers[:i], ds.availableWorkers[i+1:]...)
+			//ds.availableWorkers = append(ds.availableWorkers[:i], ds.availableWorkers[i+1:]...)
 			ds.activeWorkers[worker.contractID] = struct{}{}
 			select {
 			case worker.priorityDownloadChan <- dw:

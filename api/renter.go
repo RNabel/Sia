@@ -444,6 +444,7 @@ func (api *API) renterDownloadAsyncHandler(w http.ResponseWriter, req *http.Requ
 
 func (api *API) parseDownloadParameters(w http.ResponseWriter, req *http.Request, ps httprouter.Params) (*modules.RenterDownloadParameters, error) {
 	destination := req.FormValue("destination")
+	siapath := strings.TrimPrefix(ps.ByName("siapath"), "/") // Sia file name.
 
 	// The offset and length in bytes.
 	var offsetparam = req.FormValue("offset")
@@ -452,13 +453,20 @@ func (api *API) parseDownloadParameters(w http.ResponseWriter, req *http.Request
 
 	if len(offsetparam) == 0 && len(lengthparam) == 0 {
 		brange := req.Header.Get("Range")
-		if len(brange) > 0 && strings.Index(brange, "bytes=") == 0{
+		if len(brange) > 0 && strings.Index(brange, "bytes=") == 0 {
 			substr := brange[6:]
 			parts := strings.Split(substr, "-")
 			offsetparam = parts[0]
 			lengthparam = parts[1]
 			headerreq = true
 		}
+
+		w.Header().Add("Accept-Ranges", "bytes")
+		w.Header().Add("Content-Type", "video/quicktime")
+		if headerreq {
+			//w.WriteHeader(http.StatusPartialContent)
+		}
+
 	}
 
 	// Determines whether the response is written to response body.
@@ -517,8 +525,6 @@ func (api *API) parseDownloadParameters(w http.ResponseWriter, req *http.Request
 	if httpresp && destination != "" {
 		return nil, errors.New("`destination` cannot be defined if `httpresp=true`")
 	}
-
-	siapath := strings.TrimPrefix(ps.ByName("siapath"), "/") // Sia file name.
 
 	// Instantiate the correct DownloadWriter implementation
 	// (e.g. content written to file or response body).

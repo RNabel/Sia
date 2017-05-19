@@ -25,6 +25,7 @@ type (
 		// resultChan is a channel that the worker will use to return the
 		// results of the download.
 		resultChan chan finishedDownload
+		finished   *[]bool
 	}
 
 	// finishedDownload contains the data and error from performing a download.
@@ -109,6 +110,7 @@ func (w *worker) download(dw downloadWork) {
 	case dw.resultChan <- finishedDownload{dw.chunkDownload, data, err, dw.pieceIndex, w.contractID}:
 	case <-w.renter.tg.StopChan():
 	}
+	(*dw.finished)[dw.chunkDownload.index] = true
 }
 
 // upload will perform some upload work.
@@ -172,7 +174,9 @@ func (w *worker) work() {
 	// Check for priority downloads.
 	select {
 	case d := <-w.priorityDownloadChan:
-		w.download(d)
+		if !(*d.finished)[d.chunkDownload.index] {
+			w.download(d)
+		}
 		return
 	default:
 		// do nothing
@@ -181,7 +185,9 @@ func (w *worker) work() {
 	// Check for standard downloads.
 	select {
 	case d := <-w.downloadChan:
-		w.download(d)
+		if !(*d.finished)[d.chunkDownload.index] {
+			w.download(d)
+		}
 		return
 	default:
 		// do nothing
@@ -190,12 +196,16 @@ func (w *worker) work() {
 	// None of the priority channels have work, listen on all channels.
 	select {
 	case d := <-w.downloadChan:
-		w.download(d)
+		if !(*d.finished)[d.chunkDownload.index] {
+			w.download(d)
+		}
 		return
 	case <-w.killChan:
 		return
 	case d := <-w.priorityDownloadChan:
-		w.download(d)
+		if !(*d.finished)[d.chunkDownload.index] {
+			w.download(d)
+		}
 		return
 	case u := <-w.uploadChan:
 		w.upload(u)
@@ -241,9 +251,9 @@ func (r *Renter) updateWorkerPool() {
 			worker := &worker{
 				contractID: id,
 
-				downloadChan:         make(chan downloadWork, 1),
+				downloadChan:         make(chan downloadWork, 100000),
 				killChan:             make(chan struct{}),
-				priorityDownloadChan: make(chan downloadWork, 1),
+				priorityDownloadChan: make(chan downloadWork, 100000),
 				uploadChan:           make(chan uploadWork, 1),
 
 				renter: r,
